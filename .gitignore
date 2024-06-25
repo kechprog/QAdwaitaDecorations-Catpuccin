@@ -1,0 +1,9 @@
+build
+.cache/clangd/index
+test-app/.qt
+test-app/CMakeFiles
+test-app/CMakeCache.txt
+test-app/Makefile
+test-app/TestQtApp
+test-app/cmake_install.cmake
+TestQtApp

@@ -41,17 +41,37 @@ public:
         BackgroundInactive,
         Foreground,
         ForegroundInactive,
+
         Border,
         BorderInactive,
-        ButtonBackground,
-        ButtonBackgroundInactive,
-        HoveredButtonBackground,
-        PressedButtonBackground
+
+        ButtonUnFocused,
+
+        ButtonMinimize,
+        HoverButtonMinimize,
+        PressButtonMinimize,
+
+        ButtonMaximize,
+        HoverButtonMaximize,
+        PressButtonMaximize,
+
+        ButtonClose,
+        HoverButtonClose,
+        PressButtonClose,
     };
     enum Placement { Left = 0, Right = 1 };
     enum Button { None = 0x0, Close = 0x1, Minimize = 0x02, Maximize = 0x04 };
     Q_DECLARE_FLAGS(Buttons, Button);
-    enum ButtonIcon { CloseIcon, MinimizeIcon, MaximizeIcon, RestoreIcon };
+    enum ButtonIcon { 
+        CloseIcon, 
+        MinimizeIcon, 
+        MaximizeIcon, 
+        RestoreIcon,
+        HoverCloseIcon, 
+        HoverMinimizeIcon, 
+        HoverMaximizeIcon, 
+        HoverRestoreIcon
+    };
 
     QAdwaitaDecorations();
     virtual ~QAdwaitaDecorations() = default;
@@ -100,6 +120,8 @@ private:
     bool updateButtonHoverState(Button hoveredButton);
 
     QRectF buttonRect(Button button) const;
+    ButtonIcon iconFromButtonAndState(QAdwaitaDecorations::Button button, bool maximized);
+    QColor getButtonColor(Button button, bool active);
 
     // Default GNOME configuraiton
     Placement m_placement = Right;
@@ -115,6 +137,7 @@ private:
     QMap<ColorType, QColor> m_colors;
     std::unique_ptr<QFont> m_font;
     QPixmap m_shadowPixmap;
+    QString m_iconTheme;
     QMap<ButtonIcon, QString> m_icons;
 };
 

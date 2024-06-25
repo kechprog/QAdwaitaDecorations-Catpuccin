@@ -45,24 +45,24 @@
 #include <QtDBus/QDBusVariant>
 #include <QtDBus/QtDBus>
 
-static constexpr int ceButtonSpacing = 12;
-static constexpr int ceButtonWidth = 24;
+static constexpr int ceButtonSpacing = 14;
+static constexpr int ceButtonWidth = 16;
 static constexpr int ceCornerRadius = 12;
-static constexpr int ceShadowsWidth = 10;
-static constexpr int ceTitlebarHeight = 38;
+static constexpr int ceShadowsWidth = 36;
+static constexpr int ceTitlebarHeight = 35;
 static constexpr int ceWindowBorderWidth = 1;
 
 static QMap<QAdwaitaDecorations::ButtonIcon, QString> buttonMap = {
     { QAdwaitaDecorations::CloseIcon, QStringLiteral("window-close-symbolic") },
     { QAdwaitaDecorations::MinimizeIcon, QStringLiteral("window-minimize-symbolic") },
     { QAdwaitaDecorations::MaximizeIcon, QStringLiteral("window-maximize-symbolic") },
-    { QAdwaitaDecorations::RestoreIcon, QStringLiteral("window-restore-symbolic") }
+    { QAdwaitaDecorations::RestoreIcon, QStringLiteral("window-restore-symbolic") },
 };
 
 Q_DECL_IMPORT void qt_blurImage(QPainter *p, QImage &blurImage, qreal radius, bool quality,
                                 bool alphaOnly, int transposed = 0);
 
-Q_LOGGING_CATEGORY(QAdwaitaDecorationsLog, "qt.qpa.qadwaitadecorations", QtWarningMsg)
+Q_LOGGING_CATEGORY(QAdwaitaDecorationsLog, "qt.qpa.qadwaitadecorations", QtInfoMsg);
 
 const QDBusArgument &operator>>(const QDBusArgument &argument, QMap<QString, QVariantMap> &map)
 {
@@ -122,7 +122,8 @@ void QAdwaitaDecorations::initConfiguration()
             QLatin1String("/org/freedesktop/portal/desktop"),
             QLatin1String("org.freedesktop.portal.Settings"), QLatin1String("ReadAll"));
     message << QStringList{ { QLatin1String("org.gnome.desktop.wm.preferences") },
-                            { QLatin1String("org.freedesktop.appearance") } };
+                            { QLatin1String("org.freedesktop.appearance") },
+                            { QLatin1String("org.gnome.desktop.interface") } };
 
     QDBusPendingCall pendingCall = connection.asyncCall(message);
     QDBusPendingCallWatcher *watcher = new QDBusPendingCallWatcher(pendingCall);
@@ -138,6 +139,7 @@ void QAdwaitaDecorations::initConfiguration()
                                         .value(QLatin1String("color-scheme"))
                                         .toUInt();
                         updateColors(colorScheme == 1); // 1 == Prefer Dark
+                        
                         const QString buttonLayout =
                                 settings.value(QLatin1String("org.gnome.desktop.wm.preferences"))
                                         .value(QLatin1String("button-layout"))
@@ -145,16 +147,21 @@ void QAdwaitaDecorations::initConfiguration()
                         if (!buttonLayout.isEmpty()) {
                             updateTitlebarLayout(buttonLayout);
                         }
-                        // Workaround for QGtkStyle not having correct titlebar font
-                        // This is not going to be very precise as I want to avoid dependency on
-                        // Pango which we had in QGnomePlatform, but at least make the font bold
-                        // if detected.
+
                         const QString titlebarFont =
                                 settings.value(QLatin1String("org.gnome.desktop.wm.preferences"))
                                         .value(QLatin1String("titlebar-font"))
                                         .toString();
                         if (titlebarFont.contains(QLatin1String("bold"), Qt::CaseInsensitive)) {
                             m_font->setBold(true);
+                        }
+
+                        const QString iconTheme =
+                                settings.value(QLatin1String("org.gnome.desktop.interface"))
+                                        .value(QLatin1String("icon-theme"))
+                                        .toString();
+                        if (!iconTheme.isEmpty()) {
+                            m_iconTheme = iconTheme;
                         }
                     }
                 }
@@ -175,53 +182,44 @@ void QAdwaitaDecorations::updateColors(bool useDarkColors)
     qCDebug(QAdwaitaDecorationsLog)
             << "Changing color scheme to " << (useDarkColors ? "dark" : "light");
 
-    m_colors = { { Background, useDarkColors ? QColor(0x303030) : QColor(0xffffff) },
-                 { BackgroundInactive, useDarkColors ? QColor(0x242424) : QColor(0xfafafa) },
-                 { Foreground, useDarkColors ? QColor(0xffffff) : QColor(0x2e2e2e) },
-                 { ForegroundInactive, useDarkColors ? QColor(0x919191) : QColor(0x949494) },
-                 { Border, useDarkColors ? QColor(0x3b3b3b) : QColor(0xdbdbdb) },
-                 { BorderInactive, useDarkColors ? QColor(0x303030) : QColor(0xdbdbdb) },
-                 { ButtonBackground, useDarkColors ? QColor(0x444444) : QColor(0xebebeb) },
-                 { ButtonBackgroundInactive, useDarkColors ? QColor(0x2e2e2e) : QColor(0xf0f0f0) },
-                 { HoveredButtonBackground, useDarkColors ? QColor(0x4f4f4f) : QColor(0xe0e0e0) },
-                 { PressedButtonBackground, useDarkColors ? QColor(0x6e6e6e) : QColor(0xc2c2c2) } };
+    m_colors = { 
+        { Background, useDarkColors         ? QColor(0x24273a)           : QColor(0xe6e9ef) },
+        { BackgroundInactive, useDarkColors ? QColor(0x282c3c)           : QColor(0xeef0f4) },
+        { Foreground, useDarkColors         ? QColor(0xeff1f5)           : QColor(17, 17, 27, 222) },
+        { ForegroundInactive, useDarkColors ? QColor(239, 241, 245, 178) : QColor(17, 17, 17, 153) },
+
+        { Border, useDarkColors ? QColor(239, 241, 245, 31) : QColor(0x9b9d9f) },
+        { BorderInactive, useDarkColors ? QColor(239, 241, 245, 31) : QColor(0xeff1f5) },
+
+        { ButtonUnFocused, useDarkColors ? QColor(0x464957) : QColor(0xd1d3d8) },
+
+        { ButtonMinimize, useDarkColors      ? QColor(0xe5c890) : QColor(0xdf8e1d) },
+        { HoverButtonMinimize, useDarkColors ? QColor(0xe5c890) : QColor(0xdf8e1d) },
+        { PressButtonMinimize, useDarkColors ? QColor(0xd9af5e) : QColor(0xa96c16) },
+ 
+        { ButtonMaximize, useDarkColors      ? QColor(0xa6d189) : QColor(0x40a02b) },
+        { HoverButtonMaximize, useDarkColors ? QColor(0xa6d189) : QColor(0x40a02b) },
+        { PressButtonMaximize, useDarkColors ? QColor(0x85c05d) : QColor(0x2d701e) },
+
+        { ButtonClose, useDarkColors      ? QColor(0xea999c) : QColor(0xe64553) },
+        { HoverButtonClose, useDarkColors ? QColor(0xea999c) : QColor(0xe64553) },
+        { PressButtonClose, useDarkColors ? QColor(0xe0666b) : QColor(0xd21c2c) },
+    };
+
     forceRepaint();
 }
 
 QString getIconSvg(const QString &iconName)
 {
-    const QStringList themeNames = { QIcon::themeName(), QIcon::fallbackThemeName(),
-                                     QLatin1String("Adwaita") };
-    qCDebug(QAdwaitaDecorationsLog) << "Icon themes: " << themeNames;
 
-    for (const QString &themeName : themeNames) {
-        for (const QString &path : QIcon::themeSearchPaths()) {
-            if (path.startsWith(QLatin1Char(':')))
-                continue;
-
-            const QString fullPath = QString("%1/%2").arg(path).arg(themeName);
-            QDirIterator dirIt(fullPath, QDirIterator::Subdirectories);
-            while (dirIt.hasNext()) {
-                const QString fileName = dirIt.next();
-                const QFileInfo fileInfo(fileName);
-
-                if (fileInfo.isDir())
-                    continue;
-
-                if (fileInfo.fileName() == iconName) {
-                    qCDebug(QAdwaitaDecorationsLog)
-                            << "Using " << iconName << " from " << themeName << " theme";
-                    QFile readFile(fileInfo.filePath());
-                    readFile.open(QFile::ReadOnly);
-                    return readFile.readAll();
-                }
-            }
-        }
-    }
-
-    qCWarning(QAdwaitaDecorationsLog) << "Failed to find an svg icon for " << iconName;
-
-    return QString();
+    const QString fullPath = QString("%1/.config/gtk-4.0/assets/%2")
+        .arg(QDir::homePath())
+        .arg(iconName);
+    QFile readFile(fullPath);
+    readFile.open(QFile::ReadOnly);
+    QString fileContent = readFile.readAll();
+    qCDebug(QAdwaitaDecorationsLog) << "File Content(" << fullPath << "): " << fileContent;
+    return fileContent;
 }
 
 void QAdwaitaDecorations::updateIcons()
@@ -275,14 +273,18 @@ void QAdwaitaDecorations::updateTitlebarLayout(const QString &layout)
 void QAdwaitaDecorations::settingChanged(const QString &group, const QString &key,
                                          const QDBusVariant &value)
 {
-    if (group == QLatin1String("org.gnome.desktop.wm.preferences")
-        && key == QLatin1String("button-layout")) {
+    if (group == QLatin1String("org.gnome.desktop.wm.preferences") && key == QLatin1String("button-layout")) {
         const QString layout = value.variant().toString();
         updateTitlebarLayout(layout);
-    } else if (group == QLatin1String("org.freedesktop.appearance")
-               && key == QLatin1String("color-scheme")) {
+    } else if (group == QLatin1String("org.freedesktop.appearance") && key == QLatin1String("color-scheme")) {
         const uint colorScheme = value.variant().toUInt();
         updateColors(colorScheme == 1); // 1 == Prefer Dark
+    } else if (group == QLatin1String("org.gnome.desktop.interface") && key == QLatin1String("icon-theme")) {
+        const QString iconTheme = value.variant().toString();
+        if (!iconTheme.isEmpty()) {
+            m_iconTheme = iconTheme;
+            updateIcons();
+        }
     }
 }
 
@@ -414,22 +416,71 @@ void QAdwaitaDecorations::paint(QPaintDevice *device)
             backgroundPainter.drawPixmap(QPointF(), source);
             backgroundPainter.end();
 
-            QImage blurredImage(surfaceRect.size(), QImage::Format_ARGB32_Premultiplied);
-            blurredImage.fill(0);
+            // Create the shadow image with multiple layers
+            QImage shadowImage(surfaceRect.size(), QImage::Format_ARGB32_Premultiplied);
+            shadowImage.fill(0);
+
+            // Layer 1
             {
-                QPainter blurPainter(&blurredImage);
-                qt_blurImage(&blurPainter, backgroundImage, 12, false, false);
+                QImage blurredLayer(surfaceRect.size(), QImage::Format_ARGB32_Premultiplied);
+                blurredLayer.fill(0);
+
+                QPainter layerPainter(&blurredLayer);
+                layerPainter.drawPixmap(QPointF(), source);
+                layerPainter.end();
+
+                QPainter blurPainter(&shadowImage);
+                qt_blurImage(&blurPainter, blurredLayer, 2, false, false);
                 blurPainter.end();
+
+                QPainter shadowPainter(&shadowImage);
+                shadowPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+                QRect rect = shadowImage.rect().marginsRemoved(QMargins(8, 8, 8, 8));
+                shadowPainter.fillRect(rect, QColor(0, 0, 0, 0.15 * 255));
+                shadowPainter.end();
             }
-            backgroundImage = blurredImage;
 
-            backgroundPainter.begin(&backgroundImage);
-            backgroundPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-            QRect rect = backgroundImage.rect().marginsRemoved(QMargins(8, 8, 8, 8));
-            backgroundPainter.fillRect(rect, QColor(0, 0, 0, 160));
-            backgroundPainter.end();
+            // Layer 2
+            {
+                QImage blurredLayer(surfaceRect.size(), QImage::Format_ARGB32_Premultiplied);
+                blurredLayer.fill(0);
 
-            m_shadowPixmap = QPixmap::fromImage(backgroundImage);
+                QPainter layerPainter(&blurredLayer);
+                layerPainter.drawPixmap(QPointF(), source);
+                layerPainter.end();
+
+                QPainter blurPainter(&shadowImage);
+                qt_blurImage(&blurPainter, blurredLayer, 3, false, false);
+                blurPainter.end();
+
+                QPainter shadowPainter(&shadowImage);
+                shadowPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+                QRect rect = shadowImage.rect().marginsRemoved(QMargins(8, 8, 8, 8));
+                shadowPainter.fillRect(rect, QColor(0, 0, 0, 0.18 * 255));
+                shadowPainter.end();
+            }
+
+            // Layer 3
+            {
+                QImage blurredLayer(surfaceRect.size(), QImage::Format_ARGB32_Premultiplied);
+                blurredLayer.fill(0);
+
+                QPainter layerPainter(&blurredLayer);
+                layerPainter.drawPixmap(QPointF(), source);
+                layerPainter.end();
+
+                QPainter blurPainter(&shadowImage);
+                qt_blurImage(&blurPainter, blurredLayer, 6, false, false);
+                blurPainter.end();
+
+                QPainter shadowPainter(&shadowImage);
+                shadowPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+                QRect rect = shadowImage.rect().marginsRemoved(QMargins(8, 8, 8, 8));
+                shadowPainter.fillRect(rect, QColor(0, 0, 0, 0.12 * 255));
+                shadowPainter.end();
+            }
+
+            m_shadowPixmap = QPixmap::fromImage(shadowImage);
         }
 
         QRect clips[] = { QRect(0, 0, surfaceRect.width(), margins().top()),
@@ -559,20 +610,7 @@ static void renderButtonIcon(const QString &svgIcon, QPainter *painter, const QR
     painter->restore();
 }
 
-static void renderButtonIcon(QAdwaitaDecorations::ButtonIcon buttonIcon, QPainter *painter,
-                             const QRect &rect)
-{
-    QString iconName = buttonMap[buttonIcon];
-
-    painter->save();
-    painter->setRenderHints(QPainter::Antialiasing, true);
-    painter->drawPixmap(rect, QIcon::fromTheme(iconName).pixmap(ceButtonWidth, ceButtonWidth));
-
-    painter->restore();
-}
-
-static QAdwaitaDecorations::ButtonIcon iconFromButtonAndState(QAdwaitaDecorations::Button button,
-                                                              bool maximized)
+QAdwaitaDecorations::ButtonIcon QAdwaitaDecorations::iconFromButtonAndState(QAdwaitaDecorations::Button button, bool maximized)
 {
     if (button == QAdwaitaDecorations::Close)
         return QAdwaitaDecorations::CloseIcon;
@@ -580,8 +618,9 @@ static QAdwaitaDecorations::ButtonIcon iconFromButtonAndState(QAdwaitaDecoration
         return QAdwaitaDecorations::MinimizeIcon;
     else if (button == QAdwaitaDecorations::Maximize && maximized)
         return QAdwaitaDecorations::RestoreIcon;
-    else
+    else if (button == QAdwaitaDecorations::Maximize)
         return QAdwaitaDecorations::MaximizeIcon;
+    return QAdwaitaDecorations::CloseIcon;
 }
 
 void QAdwaitaDecorations::paintButton(Button button, QPainter *painter)
@@ -595,29 +634,49 @@ void QAdwaitaDecorations::paintButton(Button button, QPainter *painter)
 #endif
     const bool maximized = windowStates & Qt::WindowMaximized;
 
-    QColor activeBackgroundColor;
-    if (m_clicking == button)
-        activeBackgroundColor = m_colors[PressedButtonBackground];
-    else if (m_hoveredButtons.testFlag(button))
-        activeBackgroundColor = m_colors[HoveredButtonBackground];
-    else
-        activeBackgroundColor = m_colors[ButtonBackground];
-
-    const QColor buttonBackgroundColor =
-            active ? activeBackgroundColor : m_colors[ButtonBackgroundInactive];
     const QColor foregroundColor = active ? m_colors[Foreground] : m_colors[ForegroundInactive];
+    const QColor buttonBackGround = getButtonColor(button, active);
 
     const QRect btnRect = buttonRect(button).toRect();
-    renderFlatRoundedButtonFrame(button, painter, btnRect, buttonBackgroundColor);
+    renderFlatRoundedButtonFrame(button, painter, btnRect, buttonBackGround);
 
     QRect adjustedBtnRect = btnRect;
     adjustedBtnRect.setSize(QSize(16, 16));
-    adjustedBtnRect.translate(4, 4);
+    adjustedBtnRect.translate(0, 0);
     const QString svgIcon = m_icons[iconFromButtonAndState(button, maximized)];
     if (!svgIcon.isEmpty())
-        renderButtonIcon(svgIcon, painter, adjustedBtnRect, foregroundColor);
-    else // Fallback to use QIcon
-        renderButtonIcon(iconFromButtonAndState(button, maximized), painter, adjustedBtnRect);
+        renderButtonIcon(svgIcon, painter, adjustedBtnRect,
+            m_hoveredButtons.testFlag(button) ? foregroundColor : buttonBackGround);
+    else
+        return;
+}
+
+QColor QAdwaitaDecorations::getButtonColor(Button button, bool active) {
+    if (!active)
+        return m_colors[ButtonUnFocused];
+
+    switch (button) {
+        case Button::Close:
+            if (m_clicking == button)
+                return m_colors[PressButtonClose];
+            else 
+                return m_colors[ButtonClose];
+
+        case Button::Maximize:
+            if (m_clicking == button)
+                return m_colors[PressButtonMaximize];
+            else
+                return m_colors[ButtonMaximize];
+
+        case Button::Minimize:
+            if (m_clicking == button)
+                return m_colors[PressButtonMinimize];
+            else
+                return m_colors[ButtonMinimize];
+        
+        default:
+            return QColor();
+    }
 }
 
 bool QAdwaitaDecorations::clickButton(Qt::MouseButtons b, Button btn)
