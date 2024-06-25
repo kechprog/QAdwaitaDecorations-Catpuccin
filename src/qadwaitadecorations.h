@@ -122,6 +122,7 @@ private:
     QRectF buttonRect(Button button) const;
     ButtonIcon iconFromButtonAndState(QAdwaitaDecorations::Button button, bool maximized);
     QColor getButtonColor(Button button, bool active);
+    QString getIconSvg(const QString &iconName);
 
     // Default GNOME configuraiton
     Placement m_placement = Right;

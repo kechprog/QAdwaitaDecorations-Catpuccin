@@ -209,17 +209,40 @@ void QAdwaitaDecorations::updateColors(bool useDarkColors)
     forceRepaint();
 }
 
-QString getIconSvg(const QString &iconName)
+QString QAdwaitaDecorations::getIconSvg(const QString &iconName)
 {
+    const QStringList themeNames = { QIcon::themeName(), QIcon::fallbackThemeName(),
+                                     m_iconTheme };
+    qCDebug(QAdwaitaDecorationsLog) << "Icon themes: " << themeNames;
 
-    const QString fullPath = QString("%1/.config/gtk-4.0/assets/%2")
-        .arg(QDir::homePath())
-        .arg(iconName);
-    QFile readFile(fullPath);
-    readFile.open(QFile::ReadOnly);
-    QString fileContent = readFile.readAll();
-    qCDebug(QAdwaitaDecorationsLog) << "File Content(" << fullPath << "): " << fileContent;
-    return fileContent;
+    for (const QString &themeName : themeNames) {
+        for (const QString &path : QIcon::themeSearchPaths()) {
+            if (path.startsWith(QLatin1Char(':')))
+                continue;
+
+            const QString fullPath = QString("%1/%2").arg(path).arg(themeName);
+            QDirIterator dirIt(fullPath, QDirIterator::Subdirectories);
+            while (dirIt.hasNext()) {
+                const QString fileName = dirIt.next();
+                const QFileInfo fileInfo(fileName);
+
+                if (fileInfo.isDir())
+                    continue;
+
+                if (fileInfo.fileName() == iconName) {
+                    qCDebug(QAdwaitaDecorationsLog)
+                            << "Using " << iconName << " from " << themeName << " theme";
+                    QFile readFile(fileInfo.filePath());
+                    readFile.open(QFile::ReadOnly);
+                    return readFile.readAll();
+                }
+            }
+        }
+    }
+
+    qCWarning(QAdwaitaDecorationsLog) << "Failed to find an svg icon for " << iconName;
+
+    return QString();
 }
 
 void QAdwaitaDecorations::updateIcons()
